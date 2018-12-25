@@ -1,0 +1,10 @@
+[package]
+name = "th-launcher"
+version = "0.1.0"
+authors = ["usami-renko <usami-ssc@protonmail.com>"]
+description = "A touhou game launcher."
+edition = "2018"
+
+[dependencies]
+tui     = "0.3.0"
+termion = "1.5"
