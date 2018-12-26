@@ -15,7 +15,7 @@ use tui::terminal::Frame;
 use tui::backend::TermionBackend;
 
 use crate::config::EngineConfig;
-use crate::config::manifest::EXIT_KEY;
+use crate::scene::{ EventNerve, SceneAction };
 
 use std::io;
 
@@ -37,24 +37,25 @@ fn init_terminal() -> Result<DstTerminal, failure::Error> {
     Ok(terminal)
 }
 
-fn main_loop(terminal: &mut DstTerminal, config: EngineConfig) -> THLError {
+fn main_loop(terminal: &mut DstTerminal, config: &mut EngineConfig) -> THLError {
 
-    let mut thl_scene = scene::THLScene::new();
-    let event_dispatcher = utils::THLEvents::with_config(&config.setting);
+    let mut thl_scene = scene::THLScene::new(config.tabs.clone());
+    let mut event_dispatch = EventNerve::new(config.setting.clone());
 
     loop {
+        match event_dispatch.tick()? {
+            | SceneAction::Terminal => break,
+            | SceneAction::Rendering => {},
+            | SceneAction::React(reaction) => {
+                let ops = thl_scene.react(reaction)?;
+                // TODO: Hanlde error here in a more friendly way.
+                config.update(ops)?;
+            },
+        }
+
         terminal.draw(|mut f| {
             thl_scene.draw(&mut f);
         })?;
-
-        match event_dispatcher.next()? {
-            | utils::THLEvent::Input(key) => {
-                if key == EXIT_KEY {
-                    break
-                }
-            },
-            | _ => {},
-        }
     }
 
     Ok(())
@@ -63,7 +64,7 @@ fn main_loop(terminal: &mut DstTerminal, config: EngineConfig) -> THLError {
 fn main() -> THLError {
 
     // Read configuration
-    let config = EngineConfig::init().unwrap_or_else(|| {
+    let mut config = EngineConfig::init().unwrap_or_else(|| {
         let config = EngineConfig::default();
         config.write_manifest()
             .expect("Failed to write manifest content.");
@@ -72,7 +73,7 @@ fn main() -> THLError {
 
     // Terminal initialization
     let mut terminal = init_terminal()?;
-    main_loop(&mut terminal, config)?;
+    main_loop(&mut terminal, &mut config)?;
 
     Ok(())
 }

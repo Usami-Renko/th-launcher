@@ -1,24 +1,24 @@
 
 use crate::config::ConfigAbstract;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TabsConfig {
 
-    tabs: Vec<TabConfig>,
+    pub tabs: Vec<TabConfig>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct TabConfig {
 
-    name: String,
-    items: Vec<ItemConfig>,
+    pub name: String,
+    pub items: Vec<ItemConfig>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct ItemConfig {
 
-    name: String,
-    path: String,
+    pub name: String,
+    pub path: String,
 }
 
 impl Default for TabsConfig {
@@ -26,7 +26,7 @@ impl Default for TabsConfig {
     fn default() -> TabsConfig {
 
         let welcome_tab = TabConfig {
-            name: String::from("Welcome"),
+            name: String::from("Default"),
             items: vec![],
         };
 

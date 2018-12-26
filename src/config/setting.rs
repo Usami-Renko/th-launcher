@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::config::ConfigAbstract;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SettingConfig {
 
     pub is_close_after_game_launch: bool,

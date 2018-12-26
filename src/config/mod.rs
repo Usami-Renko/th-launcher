@@ -3,7 +3,7 @@ pub mod manifest;
 pub mod tab;
 pub mod setting;
 
-use crate::config::tab::TabsConfig;
+use crate::config::tab::{ TabsConfig, TabConfig, ItemConfig };
 use crate::config::setting::SettingConfig;
 use crate::config::manifest::MANIFEST_CONFIG_NAME;
 
@@ -11,13 +11,15 @@ use std::path::PathBuf;
 use std::env;
 use std::fs;
 use std::io::{ Read, Write };
+use std::error::Error;
+use std::fmt;
 
 pub trait ConfigAbstract where Self: Sized {
 
     fn parse_toml(toml: &toml::Value) -> Option<Self>;
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct EngineConfig {
 
     pub tabs: TabsConfig,
@@ -88,5 +90,59 @@ impl EngineConfig {
         file_handle.read_to_string(&mut contents).ok()?;
 
         Some(contents)
+    }
+
+    pub fn update(&mut self, op: ConfigOp) -> crate::THLError {
+
+        match op {
+            | ConfigOp::None => return Ok(()),
+            | ConfigOp::AppendTab { config } => {
+                self.tabs.tabs.push(config);
+            },
+            | ConfigOp::RemoveTab { tab_index } => {
+                self.tabs.tabs.remove(tab_index);
+            },
+            | ConfigOp::AppendGame { tab_index, config } => {
+                self.tabs.tabs[tab_index].items.push(config);
+            },
+            | ConfigOp::RemoveGame { tab_index, item_index } => {
+                self.tabs.tabs[tab_index].items.remove(item_index);
+            }
+        }
+
+        // update local toml file.
+        self.write_manifest()
+    }
+}
+
+pub enum ConfigOp {
+
+    None,
+    AppendTab { config: TabConfig },
+    RemoveTab { tab_index: usize },
+    AppendGame { tab_index: usize, config: ItemConfig },
+    RemoveGame { tab_index: usize, item_index: usize },
+}
+
+#[derive(Debug)]
+pub enum ConfigError {
+
+    NameEmpty,
+    PathEmpty,
+    PathInvalid,
+}
+
+impl Error for ConfigError {}
+impl fmt::Display for ConfigError {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        let description = match self {
+            | ConfigError::NameEmpty => "Operation failed. Name must not be empty.",
+            | ConfigError::PathEmpty => "Operation failed. Path must not be empty.",
+            | ConfigError::PathInvalid => "Path is not an valid value.",
+        };
+
+        write!(f, "{}", description)
     }
 }

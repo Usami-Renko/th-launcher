@@ -23,10 +23,9 @@ pub struct THLEvents {
 
 impl THLEvents {
 
-    pub fn with_config(config: &SettingConfig) -> THLEvents {
+    pub fn with_config(config: SettingConfig) -> THLEvents {
 
         let (tx, rx) = mpsc::channel();
-        let tick_rate = config.tick_rate.clone();
 
         let input_handle = {
 
@@ -56,7 +55,7 @@ impl THLEvents {
                 let tx = tx.clone();
                 loop {
                     tx.send(THLEvent::Tick).unwrap();
-                    thread::sleep(tick_rate);
+                    thread::sleep(config.tick_rate);
                 }
             })
         };
