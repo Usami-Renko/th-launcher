@@ -23,7 +23,7 @@ impl OperationPainter {
 
 impl TerminalPainter for OperationPainter {
 
-    fn draw(&mut self, f: &mut crate::DestFrame, area: Rect) {
+    fn draw(&mut self, f: &mut crate::DstFrame, area: Rect) {
 
         self.block.render(f, area);
     }

@@ -11,7 +11,7 @@ use crate::scene::ops::OperationPainter;
 
 pub trait TerminalPainter {
 
-    fn draw(&mut self, f: &mut crate::DestFrame, area: Rect);
+    fn draw(&mut self, f: &mut crate::DstFrame, area: Rect);
 }
 
 pub struct THLScene {
@@ -36,14 +36,14 @@ impl THLScene {
             ].as_ref());
 
         THLScene {
-            layout: chunks,
+            layout : chunks,
             navtab : NavTabPainter::new(),
             content: ContentPainter::new(),
             ops    : OperationPainter::new(),
         }
     }
 
-    pub fn draw(&mut self, f: &mut crate::DestFrame) {
+    pub fn draw(&mut self, f: &mut crate::DstFrame) {
 
         let chunks = self.layout.clone()
             .split(f.size());

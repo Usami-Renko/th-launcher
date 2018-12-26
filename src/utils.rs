@@ -5,7 +5,9 @@ use termion::input::TermRead;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+
+use crate::config::manifest::EXIT_KEY;
+use crate::config::setting::SettingConfig;
 
 pub enum THLEvent<I> {
     Input(I),
@@ -19,35 +21,12 @@ pub struct THLEvents {
     tick_handle : thread::JoinHandle<()>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct THLConfig {
-
-    pub exit_key : Key,
-    pub tick_rate: Duration,
-}
-
-impl Default for THLConfig {
-
-    fn default() -> THLConfig {
-
-        THLConfig {
-            exit_key : Key::Esc,
-            tick_rate: Duration::from_millis(250),
-        }
-    }
-}
-
 impl THLEvents {
 
-    #[allow(dead_code)]
-    pub fn new() -> THLEvents {
-
-        THLEvents::with_config(THLConfig::default())
-    }
-
-    pub fn with_config(config: THLConfig) -> THLEvents {
+    pub fn with_config(config: &SettingConfig) -> THLEvents {
 
         let (tx, rx) = mpsc::channel();
+        let tick_rate = config.tick_rate.clone();
 
         let input_handle = {
 
@@ -61,7 +40,7 @@ impl THLEvents {
                             return
                         }
 
-                        if key == config.exit_key {
+                        if key == EXIT_KEY {
                             return
                         }
                     }
@@ -77,7 +56,7 @@ impl THLEvents {
                 let tx = tx.clone();
                 loop {
                     tx.send(THLEvent::Tick).unwrap();
-                    thread::sleep(config.tick_rate);
+                    thread::sleep(tick_rate);
                 }
             })
         };
