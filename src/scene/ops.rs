@@ -67,7 +67,7 @@ impl OperationPainter {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Min(4), Constraint::Length(2)].as_ref());
+            .constraints([Constraint::Min(3), Constraint::Length(2)].as_ref());
 
         OperationPainter {
             block, layout,
@@ -162,7 +162,7 @@ impl OperationPainter {
 
                 let mut new_inst = CommonInstruction::new();
 
-                let result = if true {
+                let result = if inst.input_name.is_empty() {
                     new_inst.hint = Some(String::from("Operation failed. Name must not be empty."));
                     ConfigOp::None
                 } else {
@@ -280,7 +280,7 @@ impl DrawableInstruction for CommonInstruction {
     fn draw_hints(&self, f: &mut crate::DstFrame, area: Rect) {
 
         let texts = [
-            Text::raw("Use arrow key to select game.\n"),
+            Text::raw("Use arrow key to select game and tab.\n"),
             Text::raw("Press ESC to quit the program."),
         ];
 

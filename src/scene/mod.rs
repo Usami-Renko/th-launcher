@@ -39,7 +39,7 @@ impl THLScene {
             .constraints([
                 Constraint::Length(3),
                 Constraint::Min(5),
-                Constraint::Length(10),
+                Constraint::Length(8),
             ].as_ref());
 
         THLScene {
@@ -225,7 +225,9 @@ impl EventNerve {
                         | _ => {},
                     }
                 },
-                | THLOperation::AppendingTab => {
+                | THLOperation::AppendingTab
+                | THLOperation::RemovingGame
+                | THLOperation::RemovingTab => {
                     match key {
                         | Key::Esc => {
                             self.op = THLOperation::Common;
@@ -238,20 +240,6 @@ impl EventNerve {
                         | Key::Char(_)
                         | Key::Delete
                         | Key::Backspace => return Ok(SceneAction::React(SceneReaction::UserInput(key))),
-                        | _ => {},
-                    }
-                },
-                | THLOperation::RemovingGame
-                | THLOperation::RemovingTab => {
-                    match key {
-                        | Key::Esc => {
-                            self.op = THLOperation::Common;
-                            return Ok(SceneAction::React(SceneReaction::CancelOp))
-                        },
-                        | Key::Char('\n') => {
-                            self.op = THLOperation::Common;
-                            return Ok(SceneAction::React(SceneReaction::ConfirmAction))
-                        },
                         | _ => {},
                     }
                 },
