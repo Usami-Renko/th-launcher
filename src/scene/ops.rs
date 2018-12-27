@@ -1,15 +1,16 @@
 
 use termion::event::Key;
-use tui::layout::{ Layout, Rect, Alignment, Direction, Constraint };
+use tui::layout::{ Layout, Rect, Direction, Constraint };
 use tui::style::{ Style, Color };
 use tui::widgets::{ Block, Text, Paragraph, Borders, Widget };
 
 use std::path::Path;
+use std::str::FromStr;
 
 use crate::scene::TerminalPainter;
 use crate::scene::THLOperation;
-use crate::config::{ ConfigOp, ConfigError };
-use crate::config::tab::ItemConfig;
+use crate::config::ConfigOp;
+use crate::config::tab::{ TabConfig, ItemConfig };
 
 pub struct OperationPainter {
 
@@ -36,7 +37,19 @@ impl TerminalPainter for OperationPainter {
             | InstructionType::NewGame(ref v) => {
                 v.draw_ops(f, chunks[0]);
                 v.draw_hints(f, chunks[1]);
-            }
+            },
+            | InstructionType::NewTab(ref v) => {
+                v.draw_ops(f, chunks[0]);
+                v.draw_hints(f, chunks[1]);
+            },
+            | InstructionType::RemoveGame(ref v) => {
+                v.draw_ops(f, chunks[0]);
+                v.draw_hints(f, chunks[1]);
+            },
+            | InstructionType::RemoveTab(ref v) => {
+                v.draw_ops(f, chunks[0]);
+                v.draw_hints(f, chunks[1]);
+            },
         }
     }
 }
@@ -51,12 +64,12 @@ impl OperationPainter {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Min(1), Constraint::Max(2)].as_ref());
+            .constraints([Constraint::Min(4), Constraint::Length(2)].as_ref());
 
         OperationPainter {
             block, layout,
             current_tab: 0,
-            instruction: InstructionType::Common(CommonInstruction),
+            instruction: InstructionType::Common(CommonInstruction::new()),
         }
     }
 
@@ -66,18 +79,22 @@ impl OperationPainter {
 
     pub fn switch_mode(&mut self, op: THLOperation) {
         match op {
-            | THLOperation::Common => self.instruction = InstructionType::Common(CommonInstruction),
+            | THLOperation::Common        => self.instruction = InstructionType::Common(CommonInstruction::new()),
             | THLOperation::AppendingGame => self.instruction = InstructionType::NewGame(NewGameInstruction::new()),
-            | _ => {
-                unimplemented!()
-            }
+            | THLOperation::AppendingTab  => self.instruction = InstructionType::NewTab(NewTabInstruction::new()),
+            | THLOperation::RemovingGame  => self.instruction = InstructionType::RemoveGame(RemoveGameInstruction::new()),
+            | THLOperation::RemovingTab   => self.instruction = InstructionType::RemoveTab(RemoveTabInstruction::new()),
         }
     }
 
     pub fn input_word(&mut self, key: Key) {
 
-        if let InstructionType::NewGame(ref mut inst) = self.instruction {
-            inst.receive_input(key);
+        match self.instruction {
+            | InstructionType::NewGame(ref mut inst)    => inst.receive_input(key),
+            | InstructionType::NewTab(ref mut inst)     => inst.receive_input(key),
+            | InstructionType::RemoveGame(ref mut inst) => inst.receive_input(key),
+            | InstructionType::RemoveTab(ref mut inst)  => inst.receive_input(key),
+            | _ => {},
         }
     }
 
@@ -90,39 +107,110 @@ impl OperationPainter {
 
     pub fn cancel_op(&mut self) {
 
-        match self.instruction {
-            | InstructionType::NewGame(_) => self.instruction = InstructionType::Common(CommonInstruction),
-            | _ => {},
-        }
+        self.instruction = InstructionType::Common(CommonInstruction::new());
     }
 
-    pub fn confirm_op(&mut self) -> Result<ConfigOp, ConfigError> {
+    pub fn confirm_op(&mut self) -> ConfigOp {
 
-        match self.instruction {
+        let (result, instruction) = match self.instruction {
             | InstructionType::NewGame(ref inst) => {
 
+                let mut new_inst = CommonInstruction::new();
+
+                let path = Path::new(&inst.input_path);
+
+                let mut is_success = true;
                 if inst.input_name.is_empty() {
-                    return Err(ConfigError::NameEmpty)
+                    is_success = false;
+                    new_inst.hint = Some(String::from("Operation failed. Name must not be empty."));
                 }
                 if inst.input_path.is_empty() {
-                    return Err(ConfigError::PathEmpty)
+                    is_success = false;
+                    new_inst.hint = Some(String::from("Operation failed. Path must not be empty."));
                 }
-                let path = Path::new(&inst.input_path);
                 if path.is_file() == false {
-                    return Err(ConfigError::PathInvalid)
+                    is_success = false;
+                    new_inst.hint = Some(String::from("Operation failed. Path is not an valid value."));
                 }
 
-                let result = ConfigOp::AppendGame {
-                    tab_index: self.current_tab,
-                    config: ItemConfig {
-                        name: inst.input_name.clone(),
-                        path: inst.input_path.clone(),
+                let result = if is_success {
+                    ConfigOp::AppendGame {
+                        tab_index: self.current_tab,
+                        config: ItemConfig {
+                            name: inst.input_name.clone(),
+                            path: inst.input_path.clone(),
+                        }
+                    }
+                } else {
+                    ConfigOp::None
+                };
+
+                (result, InstructionType::Common(new_inst))
+            },
+            | InstructionType::NewTab(ref inst) => {
+
+                let mut new_inst = CommonInstruction::new();
+
+                let result = if true {
+                    new_inst.hint = Some(String::from("Operation failed. Name must not be empty."));
+                    ConfigOp::None
+                } else {
+                    ConfigOp::AppendTab {
+                        config: TabConfig {
+                            name: inst.input_name.clone(),
+                            items: vec![],
+                        }
                     }
                 };
-                Ok(result)
+
+                (result, InstructionType::Common(new_inst))
             },
-            | _ => Ok(ConfigOp::None),
-        }
+            | InstructionType::RemoveGame(ref mut inst) => {
+
+                let mut new_inst = CommonInstruction::new();
+
+                let result = match usize::from_str(&inst.input_content) {
+                    | Ok(game_index) => {
+                        ConfigOp::RemoveGame {
+                            tab_index: self.current_tab,
+                            item_index: game_index,
+                        }
+                    },
+                    | Err(_) => {
+                        new_inst.hint = Some(String::from("Operation failed. Input content is not a valid integer."));
+                        ConfigOp::None
+                    }
+                };
+
+                (result, InstructionType::Common(new_inst))
+            },
+            | InstructionType::RemoveTab(ref mut inst) => {
+
+                let mut new_inst = CommonInstruction::new();
+
+                let result = match usize::from_str(&inst.input_content) {
+                    | Ok(tab_index) => {
+                        ConfigOp::RemoveTab {
+                            tab_index,
+                        }
+                    },
+                    | Err(_) => {
+                        new_inst.hint = Some(String::from("Operation failed. Input content is not a valid integer."));
+                        ConfigOp::None
+                    }
+                };
+
+                (result, InstructionType::Common(new_inst))
+            },
+            | InstructionType::Common(ref mut inst) => {
+
+                inst.hint = None;
+                return ConfigOp::None;
+            },
+        };
+
+        self.instruction = instruction;
+        result
     }
 }
 
@@ -133,26 +221,42 @@ trait DrawableInstruction where Self: Sized {
 }
 
 enum InstructionType {
+
     Common(CommonInstruction),
     NewGame(NewGameInstruction),
+    NewTab(NewTabInstruction),
+    RemoveGame(RemoveGameInstruction),
+    RemoveTab(RemoveTabInstruction),
 }
 
-pub struct CommonInstruction;
+
+// Instruction. -------------------------------------------------------------------------
+struct CommonInstruction {
+
+    hint: Option<String>,
+    style_hint: Style,
+    ops_layout: Layout,
+}
 
 impl DrawableInstruction for CommonInstruction {
 
     fn draw_ops(&self, f: &mut crate::DstFrame, area: Rect) {
 
         let texts = [
-            Text::raw("[Ctrl + n]Append a new game.\n"),
-            Text::raw("[Ctrl + d]Remove a game.\n"),
+            Text::raw("[Ctrl + n]Append a new game.  "),
             Text::raw("[Ctrl + t]Append a new tab.\n"),
+            Text::raw("[Ctrl + d]Remove a game.      "),
             Text::raw("[Ctrl + r]Remove a tab.\n"),
         ];
 
-        Paragraph::new(texts.iter())
-            .alignment(Alignment::Left)
-            .render(f, area);
+        if let Some(ref hint) = self.hint {
+
+            let chunks = self.ops_layout.clone().split(area);
+            Paragraph::new(texts.iter()).render(f, chunks[0]);
+            Paragraph::new([Text::raw(hint)].iter()).style(self.style_hint).render(f, chunks[1]);
+        } else {
+            Paragraph::new(texts.iter()).render(f, area);
+        }
     }
 
     fn draw_hints(&self, f: &mut crate::DstFrame, area: Rect) {
@@ -163,12 +267,26 @@ impl DrawableInstruction for CommonInstruction {
         ];
 
         Paragraph::new(texts.iter())
-            .alignment(Alignment::Left)
             .render(f, area);
     }
 }
 
-pub struct NewGameInstruction {
+impl CommonInstruction {
+
+    fn new() -> CommonInstruction {
+        CommonInstruction {
+            hint: None,
+            style_hint: Style::default().fg(Color::Red),
+            ops_layout: Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(2), Constraint::Length(1)].as_ref()),
+        }
+    }
+}
+// --------------------------------------------------------------------------------------
+
+// Instruction. -------------------------------------------------------------------------
+struct NewGameInstruction {
 
     layout: Layout,
 
@@ -187,32 +305,32 @@ impl DrawableInstruction for NewGameInstruction {
 
         let chunks = self.layout.clone().split(area);
 
-        let input_texts = [
-            Text::raw("Name: "),
-            Text::raw(&self.input_name),
-        ];
-        let path_texts = [
-            Text::raw("Path: "),
-            Text::raw(&self.input_path),
-        ];
+        match self.focus {
+            | InputFocus::Name => {
+                let input_texts = [Text::raw("Game Name: "), Text::raw(&self.input_name), Text::raw("_")];
+                Paragraph::new(input_texts.iter()).style(self.text_style).render(f, chunks[0]);
 
-        Paragraph::new(input_texts.iter())
-            .style(self.text_style)
-            .render(f, chunks[0]);
-        Paragraph::new(path_texts.iter())
-            .style(self.text_style)
-            .render(f, chunks[1]);
+                let path_texts = [Text::raw("Game Path: "), Text::raw(&self.input_path)];
+                Paragraph::new(path_texts.iter()).style(self.text_style).render(f, chunks[1]);
+            },
+            | InputFocus::Path => {
+                let input_texts = [Text::raw("Game Name: "), Text::raw(&self.input_name)];
+                Paragraph::new(input_texts.iter()).style(self.text_style).render(f, chunks[0]);
+
+                let path_texts = [Text::raw("Game Path: "), Text::raw(&self.input_path), Text::raw("_")];
+                Paragraph::new(path_texts.iter()).style(self.text_style).render(f, chunks[1]);
+            }
+        }
     }
 
     fn draw_hints(&self, f: &mut crate::DstFrame, area: Rect) {
 
         let texts = [
-            Text::raw("Press Enter to confirm.\n"),
-            Text::raw("Press ESC to cancel.\n"),
+            Text::raw("Press Enter to confirm. Up and Down arrow to switch input filed.\n"),
+            Text::raw("Press ESC to cancel."),
         ];
 
         Paragraph::new(texts.iter())
-            .alignment(Alignment::Left)
             .render(f, area);
     }
 }
@@ -223,7 +341,7 @@ impl NewGameInstruction {
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Length(3)].as_ref());
+            .constraints([Constraint::Min(3), Constraint::Length(3)].as_ref());
 
         NewGameInstruction {
             layout,
@@ -260,3 +378,161 @@ impl NewGameInstruction {
         }
     }
 }
+// --------------------------------------------------------------------------------------
+
+
+// Instruction. -------------------------------------------------------------------------
+struct NewTabInstruction {
+
+    input_name: String,
+    text_style: Style,
+}
+
+impl DrawableInstruction for NewTabInstruction {
+
+    fn draw_ops(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let input_texts = [
+            Text::raw("Tab Name: "),
+            Text::raw(&self.input_name),
+        ];
+
+        Paragraph::new(input_texts.iter())
+            .style(self.text_style)
+            .render(f, area);
+    }
+
+    fn draw_hints(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let texts = [
+            Text::raw("Press Enter to confirm.\n"),
+            Text::raw("Press ESC to cancel."),
+        ];
+
+        Paragraph::new(texts.iter())
+            .render(f, area);
+    }
+}
+
+impl NewTabInstruction {
+
+    fn new() -> NewTabInstruction {
+
+        NewTabInstruction {
+            input_name: String::new(),
+            text_style: Style::default().fg(Color::Yellow),
+        }
+    }
+
+    fn receive_input(&mut self, key: Key) {
+
+        match key {
+            | Key::Backspace => { self.input_name.pop(); }
+            | Key::Char(ch)  => self.input_name.push(ch),
+            | _ => {},
+        }
+    }
+}
+// --------------------------------------------------------------------------------------
+
+// Instruction. -------------------------------------------------------------------------
+struct RemoveGameInstruction {
+
+    input_content: String,
+}
+
+impl DrawableInstruction for RemoveGameInstruction {
+
+    fn draw_ops(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let input_texts = [
+            Text::raw("Please input game index: "),
+            Text::raw(&self.input_content),
+        ];
+
+        Paragraph::new(input_texts.iter())
+            .render(f, area);
+    }
+
+    fn draw_hints(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let texts = [
+            Text::raw("Press Enter to confirm.\n"),
+            Text::raw("Press ESC to cancel."),
+        ];
+
+        Paragraph::new(texts.iter())
+            .render(f, area);
+    }
+}
+
+impl RemoveGameInstruction {
+
+    fn new() -> RemoveGameInstruction {
+
+        RemoveGameInstruction {
+            input_content: String::new(),
+        }
+    }
+
+    fn receive_input(&mut self, key: Key) {
+
+        match key {
+            | Key::Backspace => { self.input_content.pop(); }
+            | Key::Char(ch)  => self.input_content.push(ch),
+            | _ => {},
+        }
+    }
+}
+// --------------------------------------------------------------------------------------
+
+// Instruction. -------------------------------------------------------------------------
+struct RemoveTabInstruction {
+
+    input_content: String,
+}
+
+impl DrawableInstruction for RemoveTabInstruction {
+
+    fn draw_ops(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let input_texts = [
+            Text::raw("Please input tab index: "),
+            Text::raw(&self.input_content),
+        ];
+
+        Paragraph::new(input_texts.iter())
+            .render(f, area);
+    }
+
+    fn draw_hints(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let texts = [
+            Text::raw("Press Enter to confirm.\n"),
+            Text::raw("Press ESC to cancel."),
+        ];
+
+        Paragraph::new(texts.iter())
+            .render(f, area);
+    }
+}
+
+impl RemoveTabInstruction {
+
+    fn new() -> RemoveTabInstruction {
+
+        RemoveTabInstruction {
+            input_content: String::new(),
+        }
+    }
+
+    fn receive_input(&mut self, key: Key) {
+
+        match key {
+            | Key::Backspace => { self.input_content.pop(); },
+            | Key::Char(ch) => self.input_content.push(ch),
+            | _ => {},
+        }
+    }
+}
+// --------------------------------------------------------------------------------------

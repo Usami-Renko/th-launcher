@@ -9,7 +9,7 @@ use crate::config::tab::{ TabsConfig, TabConfig };
 
 pub struct ContentPainter {
 
-    pub state: ListState,
+    state: ListState,
     current_tab: usize,
 
     tabs: Vec<TabConfig>,
@@ -19,7 +19,7 @@ pub struct ContentPainter {
     style_unselect: Style,
 }
 
-pub struct ListState {
+struct ListState {
 
     index: Option<usize>,
     count: usize,
@@ -65,6 +65,7 @@ impl ContentPainter {
     }
 
     pub fn update_tab(&mut self, ops: &ConfigOp) {
+
         match ops {
             | ConfigOp::AppendGame { tab_index, config } => {
                 self.tabs[*tab_index].items.push(config.clone());
@@ -89,7 +90,7 @@ impl ContentPainter {
 
     pub fn draw_welcome(&self, f: &mut crate::DstFrame, area: Rect) {
 
-        Paragraph::new([Text::raw("The game list is empty, please try to add a new game.\n")].iter())
+        Paragraph::new([Text::raw("The game list is empty, please try to add a new game.")].iter())
             .alignment(Alignment::Left)
             .render(f, area);
     }
@@ -104,7 +105,7 @@ impl ContentPainter {
             .select(self.state.index)
             .style(self.style_unselect)
             .highlight_style(self.style_selected)
-            .highlight_symbol(">>")
+            .highlight_symbol(crate::config::manifest::HIGHLIGHT_SYMBOL)
             .render(f, area);
     }
 
@@ -112,11 +113,25 @@ impl ContentPainter {
     pub fn launch(&self) {
         unimplemented!()
     }
+
+    pub fn next_tab(&mut self) {
+
+        if self.tabs[self.current_tab].items.is_empty() == false {
+            self.state.next();
+        }
+    }
+
+    pub fn previous_tab(&mut self) {
+
+        if self.tabs[self.current_tab].items.is_empty() == false {
+            self.state.previous();
+        }
+    }
 }
 
 impl ListState {
 
-    pub fn next(&mut self) {
+    fn next(&mut self) {
 
         self.index = if let Some(index) = self.index {
             Some((index + 1) % self.count)
@@ -125,7 +140,7 @@ impl ListState {
         };
     }
 
-    pub fn previous(&mut self) {
+    fn previous(&mut self) {
 
         self.index = if let Some(index) = self.index {
             Some((index + self.count - 1) % self.count)

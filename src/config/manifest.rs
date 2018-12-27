@@ -4,6 +4,8 @@ use termion::event::Key;
 pub const MANIFEST_CONFIG_NAME: &str = "thl.toml";
 pub const EXIT_KEY: Key = Key::Esc;
 
+pub const HIGHLIGHT_SYMBOL: &str = "🏹";
+
 #[allow(dead_code)]
 fn complete_manifest_toml() {
 

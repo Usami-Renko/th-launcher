@@ -6,7 +6,7 @@ use std::io;
 use std::sync::mpsc;
 use std::thread;
 
-use crate::config::manifest::EXIT_KEY;
+// use crate::config::manifest::EXIT_KEY;
 use crate::config::setting::SettingConfig;
 
 pub enum THLEvent<I> {
@@ -17,8 +17,8 @@ pub enum THLEvent<I> {
 pub struct THLEvents {
 
     rx: mpsc::Receiver<THLEvent<Key>>,
-    input_handle: thread::JoinHandle<()>,
-    tick_handle : thread::JoinHandle<()>,
+    _input_handle: thread::JoinHandle<()>,
+    _tick_handle : thread::JoinHandle<()>,
 }
 
 impl THLEvents {
@@ -31,6 +31,7 @@ impl THLEvents {
 
             let tx = tx.clone();
             thread::spawn(move || {
+
                 let stdin = io::stdin();
                 for evt in stdin.keys() {
 
@@ -39,9 +40,9 @@ impl THLEvents {
                             return
                         }
 
-                        if key == EXIT_KEY {
-                            return
-                        }
+                        //if key == EXIT_KEY {
+                        //    return
+                        //}
                     }
                 }
             })
@@ -54,14 +55,19 @@ impl THLEvents {
                 // TODO: Figure it why clone here.
                 let tx = tx.clone();
                 loop {
-                    tx.send(THLEvent::Tick).unwrap();
+                    if let Err(_) = tx.send(THLEvent::Tick) {
+                        return
+                    }
+
                     thread::sleep(config.tick_rate);
                 }
             })
         };
 
         THLEvents {
-            rx, input_handle, tick_handle,
+            rx,
+            _input_handle: input_handle,
+            _tick_handle : tick_handle,
         }
     }
 

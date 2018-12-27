@@ -7,19 +7,17 @@ use crate::config::tab::{ TabsConfig, TabConfig, ItemConfig };
 use crate::config::setting::SettingConfig;
 use crate::config::manifest::MANIFEST_CONFIG_NAME;
 
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 use std::fs;
 use std::io::{ Read, Write };
-use std::error::Error;
-use std::fmt;
 
 pub trait ConfigAbstract where Self: Sized {
 
     fn parse_toml(toml: &toml::Value) -> Option<Self>;
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct EngineConfig {
 
     pub tabs: TabsConfig,
@@ -107,7 +105,7 @@ impl EngineConfig {
             },
             | ConfigOp::RemoveGame { tab_index, item_index } => {
                 self.tabs.tabs[tab_index].items.remove(item_index);
-            }
+            },
         }
 
         // update local toml file.
@@ -122,27 +120,4 @@ pub enum ConfigOp {
     RemoveTab { tab_index: usize },
     AppendGame { tab_index: usize, config: ItemConfig },
     RemoveGame { tab_index: usize, item_index: usize },
-}
-
-#[derive(Debug)]
-pub enum ConfigError {
-
-    NameEmpty,
-    PathEmpty,
-    PathInvalid,
-}
-
-impl Error for ConfigError {}
-impl fmt::Display for ConfigError {
-
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-
-        let description = match self {
-            | ConfigError::NameEmpty => "Operation failed. Name must not be empty.",
-            | ConfigError::PathEmpty => "Operation failed. Path must not be empty.",
-            | ConfigError::PathInvalid => "Path is not an valid value.",
-        };
-
-        write!(f, "{}", description)
-    }
 }

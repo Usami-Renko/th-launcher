@@ -47,7 +47,7 @@ fn main_loop(terminal: &mut DstTerminal, config: &mut EngineConfig) -> THLError 
             | SceneAction::Terminal => break,
             | SceneAction::Rendering => {},
             | SceneAction::React(reaction) => {
-                let ops = thl_scene.react(reaction)?;
+                let ops = thl_scene.react(reaction);
                 // TODO: Hanlde error here in a more friendly way.
                 config.update(ops)?;
             },
@@ -63,7 +63,7 @@ fn main_loop(terminal: &mut DstTerminal, config: &mut EngineConfig) -> THLError 
 
 fn main() -> THLError {
 
-    // Read configuration
+    // Read configuration.
     let mut config = EngineConfig::init().unwrap_or_else(|| {
         let config = EngineConfig::default();
         config.write_manifest()
@@ -71,8 +71,9 @@ fn main() -> THLError {
         config
     });
 
-    // Terminal initialization
+    // Terminal initialization.
     let mut terminal = init_terminal()?;
+    // run the program.
     main_loop(&mut terminal, &mut config)?;
 
     Ok(())
