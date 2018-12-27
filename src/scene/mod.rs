@@ -15,6 +15,7 @@ use crate::config::manifest::EXIT_KEY;
 use crate::config::ConfigOp;
 use crate::utils::{ THLEvents, THLEvent };
 
+
 pub trait TerminalPainter {
 
     fn draw(&mut self, f: &mut crate::DstFrame, area: Rect);
@@ -52,7 +53,32 @@ impl THLScene {
     pub fn react(&mut self, reaction: SceneReaction) -> ConfigOp {
 
         match reaction {
-            | SceneReaction::LaunchGame => self.content.launch(),
+            | SceneReaction::LaunchGame => {
+
+                if let Some(current_program) = self.content.current_program() {
+
+                    self.ops.switch_mode(THLOperation::Running, Some(current_program.name.clone()));
+                    let running_result = self.content.launch();
+                    self.ops.switch_mode(THLOperation::Common, None);
+
+                    running_result.and_then(|running_status| {
+                        use std::error::Error;
+
+                        match running_status {
+                            | Ok(status) => {
+                                if status.success() == false {
+                                    Some(format!("error code: {:?}", status.code()))
+                                } else {
+                                    None
+                                }
+                            },
+                            | Err(e) => Some(String::from(e.description())),
+                        }
+                    }).and_then(|hint| {
+                        Some(self.ops.set_running_error_hint(&hint))
+                    });
+                }
+            },
             | SceneReaction::NextTab => {
                 self.navtab.state.next();
 
@@ -75,10 +101,10 @@ impl THLScene {
                 self.update_config(&ops);
                 return ops
             },
-            | SceneReaction::AppendTab => self.ops.switch_mode(THLOperation::AppendingTab),
-            | SceneReaction::RemoveTab => self.ops.switch_mode(THLOperation::RemovingTab),
-            | SceneReaction::AppendGame => self.ops.switch_mode(THLOperation::AppendingGame),
-            | SceneReaction::RemoveGame => self.ops.switch_mode(THLOperation::RemovingGame),
+            | SceneReaction::AppendTab => self.ops.switch_mode(THLOperation::AppendingTab, None),
+            | SceneReaction::RemoveTab => self.ops.switch_mode(THLOperation::RemovingTab, None),
+            | SceneReaction::AppendGame => self.ops.switch_mode(THLOperation::AppendingGame, None),
+            | SceneReaction::RemoveGame => self.ops.switch_mode(THLOperation::RemovingGame, None),
             | SceneReaction::UserInput(key) => self.ops.input_word(key),
             | SceneReaction::SwitchInputFocus => self.ops.swtich_input_focus(),
         }
@@ -129,6 +155,7 @@ pub struct EventNerve {
 #[derive(Debug)]
 pub enum THLOperation {
     Common,
+    Running,
     AppendingGame,
     RemovingGame,
     AppendingTab,
@@ -153,9 +180,7 @@ impl EventNerve {
                 | THLOperation::Common => {
 
                     match key {
-                        | EXIT_KEY   => {
-                            return Ok(SceneAction::Terminal)
-                        },
+                        | EXIT_KEY   => return Ok(SceneAction::Terminal),
                         | Key::Right => return Ok(SceneAction::React(SceneReaction::NextTab)),
                         | Key::Left  => return Ok(SceneAction::React(SceneReaction::PreviousTab)),
                         | Key::Down  => return Ok(SceneAction::React(SceneReaction::NextGame)),
@@ -229,6 +254,9 @@ impl EventNerve {
                         },
                         | _ => {},
                     }
+                },
+                | THLOperation::Running => {
+                    unreachable!()
                 },
             }
         }

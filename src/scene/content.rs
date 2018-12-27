@@ -5,7 +5,10 @@ use tui::widgets::{ Block, Borders, Paragraph, SelectableList, Text, Widget };
 
 use crate::scene::TerminalPainter;
 use crate::config::ConfigOp;
-use crate::config::tab::{ TabsConfig, TabConfig };
+use crate::config::tab::{ TabsConfig, TabConfig, ItemConfig };
+
+use std::process::{ Command, ExitStatus };
+use std::io::Error;
 
 pub struct ContentPainter {
 
@@ -110,8 +113,23 @@ impl ContentPainter {
     }
 
     /// Launch current selected game.
-    pub fn launch(&self) {
-        unimplemented!()
+    pub fn launch(&self) -> Option<Result<ExitStatus, Error>> {
+
+        if let Some(game_index) = self.state.index {
+            let game_path = &self.tabs[self.current_tab].items[game_index].path;
+
+            let command = Command::new(&game_path).status();
+            Some(command)
+        } else {
+            None
+        }
+    }
+
+    pub fn current_program(&self) -> Option<&ItemConfig> {
+
+        self.state.index.and_then(|game_index| {
+            Some(&self.tabs[self.current_tab].items[game_index])
+        })
     }
 
     pub fn next_tab(&mut self) {

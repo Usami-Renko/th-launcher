@@ -34,6 +34,9 @@ impl TerminalPainter for OperationPainter {
                 v.draw_ops(f, chunks[0]);
                 v.draw_hints(f, chunks[1]);
             },
+            | InstructionType::Running(ref v) => {
+                v.draw_ops(f, chunks[0]);
+            },
             | InstructionType::NewGame(ref v) => {
                 v.draw_ops(f, chunks[0]);
                 v.draw_hints(f, chunks[1]);
@@ -77,13 +80,14 @@ impl OperationPainter {
         self.current_tab = index;
     }
 
-    pub fn switch_mode(&mut self, op: THLOperation) {
+    pub fn switch_mode(&mut self, op: THLOperation, mess: Option<String>) {
         match op {
             | THLOperation::Common        => self.instruction = InstructionType::Common(CommonInstruction::new()),
             | THLOperation::AppendingGame => self.instruction = InstructionType::NewGame(NewGameInstruction::new()),
             | THLOperation::AppendingTab  => self.instruction = InstructionType::NewTab(NewTabInstruction::new()),
             | THLOperation::RemovingGame  => self.instruction = InstructionType::RemoveGame(RemoveGameInstruction::new()),
             | THLOperation::RemovingTab   => self.instruction = InstructionType::RemoveTab(RemoveTabInstruction::new()),
+            | THLOperation::Running       => self.instruction = InstructionType::Running(RunningInstruction::new(mess.unwrap())),
         }
     }
 
@@ -94,7 +98,7 @@ impl OperationPainter {
             | InstructionType::NewTab(ref mut inst)     => inst.receive_input(key),
             | InstructionType::RemoveGame(ref mut inst) => inst.receive_input(key),
             | InstructionType::RemoveTab(ref mut inst)  => inst.receive_input(key),
-            | _ => {},
+            | _ => unreachable!(),
         }
     }
 
@@ -108,6 +112,13 @@ impl OperationPainter {
     pub fn cancel_op(&mut self) {
 
         self.instruction = InstructionType::Common(CommonInstruction::new());
+    }
+
+    pub fn set_running_error_hint(&mut self, mess: &str) {
+
+        if let InstructionType::Common(ref mut inst) = self.instruction {
+            inst.hint = Some(String::from(format!("Some errors occur during the program running: {}", mess)));
+        }
     }
 
     pub fn confirm_op(&mut self) -> ConfigOp {
@@ -205,8 +216,11 @@ impl OperationPainter {
             | InstructionType::Common(ref mut inst) => {
 
                 inst.hint = None;
-                return ConfigOp::None;
+                return ConfigOp::None
             },
+            | InstructionType::Running(_) => {
+                unreachable!()
+            }
         };
 
         self.instruction = instruction;
@@ -223,6 +237,7 @@ trait DrawableInstruction where Self: Sized {
 enum InstructionType {
 
     Common(CommonInstruction),
+    Running(RunningInstruction),
     NewGame(NewGameInstruction),
     NewTab(NewTabInstruction),
     RemoveGame(RemoveGameInstruction),
@@ -252,10 +267,13 @@ impl DrawableInstruction for CommonInstruction {
         if let Some(ref hint) = self.hint {
 
             let chunks = self.ops_layout.clone().split(area);
-            Paragraph::new(texts.iter()).render(f, chunks[0]);
-            Paragraph::new([Text::raw(hint)].iter()).style(self.style_hint).render(f, chunks[1]);
+            Paragraph::new(texts.iter())
+                .render(f, chunks[0]);
+            Paragraph::new([Text::raw(hint)].iter()).style(self.style_hint)
+                .render(f, chunks[1]);
         } else {
-            Paragraph::new(texts.iter()).render(f, area);
+            Paragraph::new(texts.iter())
+                .render(f, area);
         }
     }
 
@@ -308,17 +326,21 @@ impl DrawableInstruction for NewGameInstruction {
         match self.focus {
             | InputFocus::Name => {
                 let input_texts = [Text::raw("Game Name: "), Text::raw(&self.input_name), Text::raw("_")];
-                Paragraph::new(input_texts.iter()).style(self.text_style).render(f, chunks[0]);
+                Paragraph::new(input_texts.iter()).style(self.text_style)
+                    .render(f, chunks[0]);
 
                 let path_texts = [Text::raw("Game Path: "), Text::raw(&self.input_path)];
-                Paragraph::new(path_texts.iter()).style(self.text_style).render(f, chunks[1]);
+                Paragraph::new(path_texts.iter()).style(self.text_style)
+                    .render(f, chunks[1]);
             },
             | InputFocus::Path => {
                 let input_texts = [Text::raw("Game Name: "), Text::raw(&self.input_name)];
-                Paragraph::new(input_texts.iter()).style(self.text_style).render(f, chunks[0]);
+                Paragraph::new(input_texts.iter()).style(self.text_style)
+                    .render(f, chunks[0]);
 
                 let path_texts = [Text::raw("Game Path: "), Text::raw(&self.input_path), Text::raw("_")];
-                Paragraph::new(path_texts.iter()).style(self.text_style).render(f, chunks[1]);
+                Paragraph::new(path_texts.iter()).style(self.text_style)
+                    .render(f, chunks[1]);
             }
         }
     }
@@ -533,6 +555,40 @@ impl RemoveTabInstruction {
             | Key::Char(ch) => self.input_content.push(ch),
             | _ => {},
         }
+    }
+}
+// --------------------------------------------------------------------------------------
+
+// Instruction. -------------------------------------------------------------------------
+struct RunningInstruction {
+
+    program: String,
+}
+
+impl DrawableInstruction for RunningInstruction {
+
+    fn draw_ops(&self, f: &mut crate::DstFrame, area: Rect) {
+
+        let input_texts = [
+            Text::raw("Running: "),
+            Text::raw(&self.program),
+            Text::raw("..."),
+        ];
+
+        Paragraph::new(input_texts.iter())
+            .render(f, area);
+    }
+
+    fn draw_hints(&self, _: &mut crate::DstFrame, _: Rect) {
+        // ignore this func...
+    }
+}
+
+impl RunningInstruction {
+
+    fn new(program: String) -> RunningInstruction {
+
+        RunningInstruction { program }
     }
 }
 // --------------------------------------------------------------------------------------
